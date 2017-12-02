@@ -1,0 +1,651 @@
+
+
+//source:
+//https://www.google.ch/patents/US6957241
+//http://www.google.ch/patents/US20020083107
+//https://www.beechwood.eu/fft-implementation-r2-dit-r4-dif-r8-dif/
+//http://www.cmlab.csie.ntu.edu.tw/cml/dsp/training/coding/transform/fft.html
+//http://dsp.stackexchange.com/questions/3481/radix-4-fft-implementation
+
+//https://community.arm.com/graphics/b/blog/posts/speeding-up-fast-fourier-transform-mixed-radix-on-mobile-arm-mali-gpu-by-means-of-opencl---part-1
+//book: "Cyfrowe przetwarzanie sygnalow" - Tomasz Zielinski it has quick version of radix-2 because it calculates less sin() and cos()
+
+
+//author marcin matysek (r)ewertyn.PL
+
+//inverse fourier transform iFFT radix-4 for N=4096 points algorithm c++ source code implementation
+//szybka odwrotna transformacja fouriera iFFT radix-4 dla N=4096 algorytm c++ kod zródlowy implementacja
+
+
+#include <iostream>
+#include "conio.h"
+#include <stdlib.h>
+#include <math.h>
+#include <cmath>
+#include <time.h>
+#include <complex>
+#include <fstream>
+
+using namespace std;
+//const double pi2=3.141592653589793238462;
+double fi=0;
+
+//complex number method:
+void fun_inverse_bits_radix_4(int N,std::complex<double> tab[]);
+void fun_fourier_transform_FFT_radix_4_N_points_universal_final(int N,std::complex<double> tab[],std::complex<double> w10,std::complex<double> w11);
+void fun_inverse_fourier_transform_FFT_radix_4_N_points_universal_final(int N,std::complex<double> tab[],std::complex<double> w10,std::complex<double> w11);
+void fun_fourier_transform_DFT_full_complex(int N,std::complex<double> tab[]);
+void fun_radix_4_podstawa1(std::complex<double> &w0,std::complex<double> &w1);
+void fun_radix_4_podstawa2(std::complex<double> &w0,std::complex<double> &w1);
+
+
+std::complex<double> nb1,nb2,nb3,nb4,nb5,nb9,nb12,nb13,nb15,nb16,nb17;
+int nb6=0,nb7=0,nb8=0,nb10=0,nb11=0,nb14=0;
+
+static double diffclock(clock_t clock2,clock_t clock1)
+{
+    double diffticks=clock1-clock2;
+    double diffms=(diffticks)/(CLOCKS_PER_SEC/1000);
+    return diffms;
+}
+int main()
+{
+    const double pi=3.141592653589793238462;
+    int N;
+    //if N==period of signal in table tab[] then resolution = 1 Hz
+    std::complex<double> w0;
+    std::complex<double> w1;
+    int nn=0,aa=0,bb=0;
+    int maks=0;
+    double time1,time2;
+    double zmienna=0;
+    int flag=0;
+    std::complex<double> tab2[4096]={};
+    std::complex<double> tab3[4096]={};
+
+    N=4096;//need to change size of tab2 in function: fun_fourier_transform_DFT_full_complex
+
+
+
+    for(int i=0;i<N;i++)
+    {
+        tab2[i].real()=i+1;
+        tab2[i].imag()=N+i+1;
+        tab3[i].real()=i+1;
+        tab3[i].imag()=N+i+1;
+    }
+
+
+    cout<<"signal 1="<<endl;
+     system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab2[j].real()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab2[j].imag()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    for(int i=0;i<N;i++)
+    {
+       // tab3[i].real()=sin(i*2*pi/N+pi/2);
+        //tab3[i].real()=tab3[i].real()+sin(i*2*2*pi/N+pi/2);
+       // tab3[i].real()=tab3[i].real()+sin(i*3*2*pi/N+pi/2);
+       // tab3[i].imag()=0;
+    }
+    cout<<"signal 2="<<endl;
+    system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab3[j].real()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab3[j].imag()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    cout<<"      start calculations:"<<endl<<endl;
+     system("pause");
+     cout<<"calculating first DFT"<<endl;
+    fun_fourier_transform_DFT_full_complex(N,tab3);
+    //////////////////////////////////////////////////////////
+     cout<<"calculating FFT"<<endl;
+    clock_t start = clock();
+    fun_radix_4_podstawa1(w0,w1);
+    fun_fourier_transform_FFT_radix_4_N_points_universal_final(N,tab2,w0,w1);
+    fun_inverse_bits_radix_4(N,tab2);
+    time1=diffclock( start, clock() );
+    ///////////////////////////////////////////////////////////
+
+
+    cout<<endl;
+    cout<<endl;
+    cout<<"frequency Hz FFT radix-4 real()"<<endl;
+    system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab2[j].real()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    cout<<"frequency Hz FFT radix-4 imag()"<<endl;
+     system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab2[j].imag()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+
+    cout<<"frequency Hz DFT real()"<<endl;
+     system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab3[j].real()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    cout<<"frequency Hz DFT imag()"<<endl;
+     system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab3[j].imag()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    cout<<"if radix-4 == DFT tab2[j].real(): "<<endl;system("pause");
+
+    flag=0;
+       for(int j=0;j<N;j++)
+        {
+          if(((tab3[j].real()-tab2[j].real()>=-0.03)&&(tab3[j].real()-tab2[j].real()<=0.03)))
+          {
+            flag++;
+            //cout.precision(4);
+            cout<<" j= "<<j<<" "<<round(tab2[j].real()*1000)/1000<<" ok ";
+            //system("pause");
+          }
+            else {
+                cout<<" j= "<<j<<" "<<-1<<" .not equal.. ";
+                //system("pause");
+            }
+        }
+        if(flag>maks){maks=flag;}
+
+	cout<<endl<<"max equal= "<<maks<<endl;
+    system("pause");
+    cout<<endl;
+
+    /////////////////////////////////////////////////////////////////
+    start = clock();
+    fun_radix_4_podstawa2(w0,w1);
+    fun_inverse_fourier_transform_FFT_radix_4_N_points_universal_final(N,tab2,w0,w1);
+    fun_inverse_bits_radix_4(N,tab2);
+    time2=diffclock( start, clock() );
+    ////////////////////////////////////////////////////////////////
+
+
+    cout<<"inverse/signal= real()"<<endl;
+       system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab2[j].real()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+    cout<<"inverse/signal= imag()"<<endl;
+    system("pause");
+    for(int j=0;j<N;j++)
+    {
+    cout.precision(4);
+    cout<<round(tab2[j].imag()*1000)/1000<<"  ";
+    }
+    cout<<endl;
+    cout<<endl;
+
+    cout<<endl;
+    cout<<"time for normal  FFT radix-4 = "<<time1<<endl;
+    cout<<"time for inverse FFT radix-4 = "<<time2<<endl;
+    system("pause");
+    return 0;
+}
+//////////////////////////////////////////////
+void fun_inverse_bits_radix_4(int N,std::complex<double> tab[])
+{
+
+//code by Sidney Burrus
+    std::complex<double> t;
+    //N=4^a;
+    // Radix-4 bit-reverse
+    double T;
+    int j = 0;
+    int N2 = N>>2;
+    int N1=0;
+    for (int i=0; i < N-1; i++) {
+        if (i < j) {
+            t = tab[i];
+            tab[i] = tab[j];
+            tab[j] = t;
+        }
+        N1 = N2;
+        while ( j >= 3*N1 ) {
+            j -= 3*N1;
+            N1 >>= 2;
+        }
+        j += N1;
+    }
+}
+///////////////////////////////////////////////////
+void fun_fourier_transform_DFT_full_complex(int N,std::complex<double> tab[])
+{
+    const double pi=3.141592653589793238462;
+    std::complex<double> tab2[4096*4]={};    // tab2[]==N
+    std::complex<double>  w[1]={{1,1}};
+
+
+double zmienna1=2*pi/(float)N;
+double fi2=fi;
+
+for (int i=0;i<N;i++)
+{
+    for(int j=0;j<N;j++)
+    {
+          //complex number method:
+          w[0].real()=cos(i*j*zmienna1+fi2);
+          w[0].imag()=(-sin(i*j*zmienna1+fi2));
+          tab2[i]=tab2[i]+tab[j]*w[0];
+
+    }
+}
+
+    for(int j=0;j<N;j++)
+    {
+      tab[j].real() =tab2[j].real()*2/N;
+      tab[j].imag() =tab2[j].imag()*2/N;
+    }
+
+}
+//////////////////
+void fun_fourier_transform_FFT_radix_4_N_points_universal_final(int N,std::complex<double> tab[],std::complex<double> w10,std::complex<double> w11)
+{
+    const double pi=3.141592653589793238462;
+    std::complex<double>  w1[1]={{1,0}};
+    std::complex<double>  w2[1]={{1,0}};
+    std::complex<double>  w3[1]={{1,0}};
+    std::complex<double>  w4[1]={{1,0}};
+    std::complex<double> tmp1,tmp2,tmp3,tmp4,tmp6,tmp7,tmp8;
+    std::complex<double> tmp10,tmp20,tmp30,tmp40;
+    int nr1=0,nr2=0,nr3=0,nr4=0,nr5=0;
+    int nr10=0,nr20=0,nr31=0,nr32=0,nr33=0;
+    int nb_stages=0,rx4=0;
+    double tmp5,tmp100,tmp200;
+    int increment=0;
+    int nn=0;
+
+
+    tmp5=2*pi/(N/1);
+    rx4=4;//radix-4
+    nn=N;
+    for(int i=0;i<100;i++)
+    {
+
+        nn=(float)nn/(float)rx4;
+         if(nn>=1.0)
+         {
+         nb_stages++;
+         }
+    }
+//stage 1
+          w1[0].real()=cos(0*tmp5);
+          w1[0].imag()=-sin(0*tmp5);
+          w2[0].real()=cos(0*tmp5);
+          w2[0].imag()=-sin(0*tmp5);
+          w3[0].real()=cos(0*tmp5);
+          w3[0].imag()=-sin(0*tmp5);
+          w4[0].real()=cos(0*tmp5);
+          w4[0].imag()=-sin(0*tmp5);
+        for(int i=0;i<(N/rx4);i++)
+        {
+
+          tmp1=w1[0]*tab[i+0];
+          tmp2=w2[0]*tab[i+N/4];
+          tmp3=w3[0]*tab[i+N/2];
+          tmp4=w4[0]*tab[i+3*N/4];
+          tmp6=w10*(tmp1-tmp3);
+          tmp7=w11*(tmp2-tmp4);
+          tmp8=tmp2+tmp4;
+         //radix-4
+            tmp10=w10*(tmp1+tmp3+tmp8);
+            tmp20=tmp6+tmp7;
+            tmp30=w10*(tmp1+tmp3-tmp8);
+            tmp40=tmp6-tmp7;
+          tab[i]       =tmp10;
+          tab[i+N/4]   =tmp20;
+          tab[i+N/2]   =tmp30;
+          tab[i+3*N/4] =tmp40;
+        }
+///////////////////////////////////////////
+
+    increment=0;
+
+    for(int stg=1;stg<nb_stages;stg++)
+    {
+        nr1=N/pow(rx4,0+increment);
+        nr2=N/pow(rx4,1+increment);
+        nr3=N/pow(rx4,2+increment);
+        nr4=pow(rx4,(nb_stages-2-increment));
+        nr5=pow(rx4,0+increment);
+        nr31=1*nr3;
+        nr32=2*nr3;
+        nr33=3*nr3;
+        for(int j=0;j<nr4;j++)
+        {
+            for(int i=0;i<rx4;i++)
+            {
+                nr20=nr2*i;
+                tmp100=nr5*i*(j+nr4)*tmp5;
+                tmp200=nr5*i*j*tmp5;
+                w1[0].real()= cos(tmp200);
+                w1[0].imag()=-sin(tmp200);
+                w2[0].real()= cos(tmp100);
+                w2[0].imag()=-sin(tmp100);
+                w3[0].real()= cos(2*tmp100-  tmp200);
+                w3[0].imag()=-sin(2*tmp100-  tmp200);
+                w4[0].real()=cos(3*tmp100-2*tmp200);
+                w4[0].imag()=-sin(3*tmp100-2*tmp200);
+                 for(int m=0;m<nr5;m++)
+                 {
+                    nr10=nr1*m;
+
+                    tmp1=w1[0]*tab[     nr20+nr10+j];
+                    tmp2=w2[0]*tab[nr31+nr20+nr10+j];
+                    tmp3=w3[0]*tab[nr32+nr20+nr10+j];
+                    tmp4=w4[0]*tab[nr33+nr20+nr10+j];
+                    tmp6=w10*(tmp1-tmp3);
+                    tmp7=w11*(tmp2-tmp4);
+                    //radix-4
+                    tmp10=w10*(tmp1+tmp2+tmp3+tmp4);
+                    tmp20=tmp6+tmp7;
+                    tmp30=w10*(tmp1-tmp2+tmp3-tmp4);
+                    tmp40=tmp6-tmp7;
+
+                    tab[     nr20+nr10+j]=tmp10;
+                    tab[nr31+nr20+nr10+j]=tmp20;
+                    tab[nr32+nr20+nr10+j]=tmp30;
+                    tab[nr33+nr20+nr10+j]=tmp40;
+                }
+            }
+        }
+        increment++;
+    }
+///////////////////////////////////////////
+    for(int j=0;j<N;j++)
+    {
+      tab[j].real() =tab[j].real()*2/N;
+      tab[j].imag() =tab[j].imag()*2/N;
+    }
+
+}
+////////////////////////////////
+
+void fun_inverse_fourier_transform_FFT_radix_4_N_points_universal_final(int N,std::complex<double> tab[],std::complex<double> w10,std::complex<double> w11)
+{
+    const double pi=3.141592653589793238462;
+    std::complex<double>  w1[1]={{1,0}};
+    std::complex<double>  w2[1]={{1,0}};
+    std::complex<double>  w3[1]={{1,0}};
+    std::complex<double>  w4[1]={{1,0}};
+    std::complex<double> tmp1,tmp2,tmp3,tmp4,tmp6,tmp7;
+    std::complex<double> tmp10,tmp20,tmp30,tmp40;
+    int nr1=0,nr2=0,nr3=0,nr4=0,nr5=0;
+    int nr10=0,nr20=0,nr31=0,nr32=0,nr33=0;
+    int nb_stages=0,rx4=0;
+    double tmp5,tmp100,tmp200;
+    int increment=0;
+    int nn=0;
+
+
+    tmp5=2*pi/(N/1);
+    rx4=4;//radix-4
+    nn=N;
+    for(int i=0;i<100;i++)
+    {
+
+        nn=(float)nn/(float)rx4;
+         if(nn>=1.0)
+         {
+         nb_stages++;
+         }
+    }
+//stage 1
+          w1[0].real()=cos(0*tmp5);
+          w1[0].imag()= sin(0*tmp5);
+          w2[0].real()=cos(0*tmp5);
+          w2[0].imag()= sin(0*tmp5);
+          w3[0].real()=cos(0*tmp5);
+          w3[0].imag()= sin(0*tmp5);
+          w4[0].real()=cos(0*tmp5);
+          w4[0].imag()= sin(0*tmp5);
+        for(int i=0;i<(N/rx4);i++)
+        {
+
+          tmp1=w1[0]*tab[i+0];
+          tmp2=w2[0]*tab[i+N/4];
+          tmp3=w3[0]*tab[i+N/2];
+          tmp4=w4[0]*tab[i+3*N/4];
+          tmp6=w10*(tmp1-tmp3);
+          tmp7=w11*(tmp2-tmp4);
+         //radix-4
+        tmp10=w10*(tmp1+tmp2+tmp3+tmp4);
+        tmp20=tmp6+tmp7;
+        tmp30=w10*(tmp1-tmp2+tmp3-tmp4);
+        tmp40=tmp6-tmp7;
+          tab[i]       =tmp10;
+          tab[i+N/4]   =tmp20;
+          tab[i+N/2]   =tmp30;
+          tab[i+3*N/4] =tmp40;
+        }
+///////////////////////////////////////////
+
+    increment=0;
+
+    for(int stg=1;stg<nb_stages;stg++)
+    {
+        nr1=N/pow(rx4,0+increment);
+        nr2=N/pow(rx4,1+increment);
+        nr3=N/pow(rx4,2+increment);
+        nr4=pow(rx4,(nb_stages-2-increment));
+        nr5=pow(rx4,0+increment);
+        nr31=1*nr3;
+        nr32=2*nr3;
+        nr33=3*nr3;
+        for(int j=0;j<nr4;j++)
+        {
+
+            for(int i=0;i<rx4;i++)
+            {
+                nr20=nr2*i;
+                /*
+                tmp100=nr5*i*(j+nr4)*tmp5;
+                tmp200=nr5*i*j*tmp5;
+                w1[0].real()= cos(tmp200);
+                w1[0].imag()= sin(tmp200);
+                w2[0].real()= cos(tmp100);
+                w2[0].imag()= sin(tmp100);
+                w3[0].real()= cos(2*tmp100-  tmp200);
+                w3[0].imag()= sin(2*tmp100-  tmp200);
+                w4[0].real()= cos(3*tmp100-2*tmp200);
+                w4[0].imag()= sin(3*tmp100-2*tmp200);
+                */
+
+                tmp100=nr5*i*(j+nr4);
+                tmp200=nr5*i*j;
+                w1[0].real()= cos(tmp200*tmp5);
+                w1[0].imag()= sin(tmp200*tmp5);
+                w2[0].real()= cos(tmp100*tmp5);
+                w2[0].imag()= sin(tmp100*tmp5);
+                w3[0].real()= cos((2*tmp100-  tmp200)*tmp5);
+                w3[0].imag()= sin((2*tmp100-  tmp200)*tmp5);
+                w4[0].real()= cos((3*tmp100-2*tmp200)*tmp5);
+                w4[0].imag()= sin((3*tmp100-2*tmp200)*tmp5);
+
+
+                 for(int m=0;m<nr5;m++)
+                 {
+                    nr10=nr1*m;
+
+                    tmp1=w1[0]*tab[     nr20+nr10+j];
+                    tmp2=w2[0]*tab[nr31+nr20+nr10+j];
+                    tmp3=w3[0]*tab[nr32+nr20+nr10+j];
+                    tmp4=w4[0]*tab[nr33+nr20+nr10+j];
+                    tmp6=w10*(tmp1-tmp3);
+                    tmp7=w11*(tmp2-tmp4);
+                    //radix-4
+                    tmp10=w10*(tmp1+tmp2+tmp3+tmp4);
+                    tmp20=tmp6+tmp7;
+                    tmp30=w10*(tmp1-tmp2+tmp3-tmp4);
+                    tmp40=tmp6-tmp7;
+
+                    tab[     nr20+nr10+j]=tmp10;
+                    tab[nr31+nr20+nr10+j]=tmp20;
+                    tab[nr32+nr20+nr10+j]=tmp30;
+                    tab[nr33+nr20+nr10+j]=tmp40;
+                }
+            }
+        }
+        increment++;
+    }
+///////////////////////////////
+    for(int j=0;j<N;j++)
+    {
+      tab[j].real() =tab[j].real()*0.5;
+      tab[j].imag() =tab[j].imag()*0.5;
+    }
+
+}
+//////////////////
+void fun_radix_4_podstawa1(std::complex<double> &w0,std::complex<double> &w1)
+{
+    const double pi=3.141592653589793238462;
+    //std::complex<double>    w0,w1,w2,w3,w4,w6,w9;
+    double tmp5=2*pi/4;
+    double fi2=fi;
+    w0.real()=round(cos(0*tmp5+fi2)*1000)/1000;
+    w0.imag()=round(-sin(0*tmp5+fi2)*1000)/1000;
+    w1.real()=round(cos(1*tmp5+fi2)*1000)/1000;
+    w1.imag()=round(-sin(1*tmp5+fi2)*1000)/1000;
+    w0=w0;
+    w1=w1;
+    w0.real()=w0.real();
+    w0.imag()=w0.imag();
+    w1.real()=w1.real();
+    w1.imag()=w1.imag();
+
+    //w2.real()=round(cos(2*tmp5)*1000)/1000;//==-w0
+    //w2.imag()=round(-sin(2*tmp5)*1000)/1000;//==-w0
+    //w3.real()=round(cos(3*tmp5)*1000)/1000;//==-w1
+    //w3.imag()=round(-sin(3*tmp5)*1000)/1000;//==-w1
+    //w4.real()=round(cos(4*tmp5)*1000)/1000;//==+w0
+    //w4.imag()=round(-sin(4*tmp5)*1000)/1000;//==+w0
+    //w6.real()=round(cos(6*tmp5)*1000)/1000;//==-w0
+    //w6.imag()=round(-sin(6*tmp5)*1000)/1000;//==-w0
+    //w9.real()=round(cos(9*tmp5)*1000)/1000;//==+w1
+    //w9.imag()=round(-sin(9*tmp5)*1000)/1000;//==+w1
+
+   //cout<<" "<<w0<<" "<<w0<<" "<<w0<<" "<<w0<<endl;
+   //cout<<" "<<w0<<" "<<w1<<" "<<w2<<" "<<w3<<endl;
+   //cout<<" "<<w0<<" "<<w2<<" "<<w4<<" "<<w6<<endl;
+   //cout<<" "<<w0<<" "<<w3<<" "<<w6<<" "<<w9<<endl;
+   //system("pause");
+}
+void fun_radix_4_podstawa2(std::complex<double> &w0,std::complex<double> &w1)
+{
+    const double pi=3.141592653589793238462;
+    //std::complex<double>    w0,w1,w2,w3,w4,w6,w9;
+    double tmp5=2*pi/4;
+    double fi2=fi;
+    w0.real()=round(cos(0*tmp5+fi2)*1000)/1000;
+    w0.imag()=round(sin(0*tmp5+fi2)*1000)/1000;
+    w1.real()=round(cos(1*tmp5+fi2)*1000)/1000;
+    w1.imag()=round(sin(1*tmp5+fi2)*1000)/1000;
+    w0=w0;
+    w1=w1;
+    w0.real()=w0.real();
+    w0.imag()=w0.imag();
+    w1.real()=w1.real();
+    w1.imag()=w1.imag();
+
+
+   //cout<<" "<<w0<<" "<<w0<<" "<<w0<<" "<<w0<<endl;
+   //cout<<" "<<w0<<" "<<w1<<" "<<w2<<" "<<w3<<endl;
+   //cout<<" "<<w0<<" "<<w2<<" "<<w4<<" "<<w6<<endl;
+   //cout<<" "<<w0<<" "<<w3<<" "<<w6<<" "<<w9<<endl;
+   //system("pause");
+}
+
+
+
+
+
+
+
+//this is new in that method:
+
+
+//when you want to have equal results that are in false modificator in normal FFT then change this:
+/*
+ fun_fourier_transform_FFT_radix_4_N_points_universal_final_official
+{
+    for(int j=0;j<N;j++)
+    {
+      tab[j].real() =tab[j].real()*2/N;
+      tab[j].imag() =tab[j].imag()*2/N;
+    }
+}
+//and:
+
+fun_inverse_fourier_transform_FFT_radix_4_N_points_universal_final_official
+{
+    for(int j=0;j<N;j++)
+    {
+      tab[j].real() =tab[j].real()*0.5;
+      tab[j].imag() =tab[j].imag()*0.5;
+    }
+}
+
+//for official modificator that is only in inverse FFT:
+
+ fun_fourier_transform_FFT_radix_4_N_points_universal_final_official
+{
+
+}
+fun_inverse_fourier_transform_FFT_radix_4_N_points_universal_final_official
+{
+    for(int i=0;i<N;i++)
+    {
+        tablica1[0][i]=tablica1[0][i]*1/(float)N;
+        tablica1[1][i]=tablica1[1][i]*1/(float)N;
+    }
+}
+
+*/
+
+
+
+//haven't try it with other function that cos(x)+jsin(x)=sin(x+pi/2)+jsin(x)
